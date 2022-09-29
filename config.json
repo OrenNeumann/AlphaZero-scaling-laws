@@ -1,0 +1,26 @@
+{
+  "evaluation_games": 400,
+  "evaluation_window": 400,
+  "evaluators": 1,
+  "game": "any",
+  "learning_rate": 0,
+  "logfile": "test",
+  "max_simulations": 300,
+  "nn_depth": null,
+  "nn_model": null,
+  "nn_width": null,
+  "observation_shape": [
+    0,
+    0,
+    0
+  ],
+  "output_size": 1,
+  "path": "./matches/",
+  "path_model_1": "./models/0/",
+  "path_model_2": "./models/1/",
+  "policy_alpha": 0,
+  "quiet": true,
+  "temperature": 0.25,
+  "uct_c": 2,
+  "weight_decay": 0
+}
