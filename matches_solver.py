@@ -18,7 +18,8 @@ import utils
 
 # Specify the game:
 game = 'pentago'
-
+# Optional: specify solver temperature if using Connect Four.
+temperature = None
 # Save all logs to:
 path_logs = '/path/to/logs/directory/' + game + '_solver/'
 # Create the directory, then copy a config.json file into it: (otherwise crashes)
@@ -43,6 +44,9 @@ def set_config(model):
         checkpoint_number_1=None,
         checkpoint_number_2=None,
         use_solver=True,
+        use_two_solvers=False,
+        solver_1_temp=temperature,
+        solver_2_temp=temperature,
         logfile='matches',
         learning_rate=0,
         weight_decay=0,

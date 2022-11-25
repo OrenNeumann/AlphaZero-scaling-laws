@@ -2,10 +2,8 @@
 Create benchmark players using either a solver (for connect Four) or a combination
 of a good agent and an opening book (for Pentago).
 See code comments for instructions on how to set up the solvers.
-
 This is a bot with the same interface as an MCTSBot, but that instead just calls a solver
 to produce perfect play policy vectors.
-
 NOTES:
     * We chose to pick a random move from the optimal ones inside SolverBot, rather than
         pass on all optimal moves and let one of them be picked by _my_play_game.
@@ -22,6 +20,9 @@ from open_spiel.python.algorithms import mcts
 from open_spiel.python.algorithms.alpha_zero import evaluator as evaluator_lib
 from pentago_solver import pentago_solver
 import AZ_helper_lib as AZh
+from scipy.special import softmax
+
+from subprocess import PIPE
 
 config = AZh.Config(
     game="pentago",
@@ -32,6 +33,9 @@ config = AZh.Config(
     checkpoint_number_1=None,
     checkpoint_number_2=None,
     use_solver=False,
+    use_two_solvers=False,
+    solver_1_temp=None,
+    solver_2_temp=None,
     logfile=None,
     learning_rate=0,
     weight_decay=0,
@@ -52,8 +56,7 @@ config = AZh.Config(
     quiet=True,
 )
 
-
-def connect_four_solver(state, full_info=False):
+def connect_four_solver(state, full_info=False, temperature=None):
     """ Produces an optimal policy for the current state.
         Returns: An array of optimal moves, i.e. moves that received the
             maximal score from the solver.
@@ -70,6 +73,8 @@ def connect_four_solver(state, full_info=False):
         https://github.com/PascalPons/connect4/releases/tag/book
         and place it in the parent directory.
         """
+    if full_info and (temperature is not None):
+        raise Exception('full_info not supported with temperature.')
     moves = ""
     for action in state.full_history():
         # The solver starts counting moves from 1:
@@ -77,13 +82,14 @@ def connect_four_solver(state, full_info=False):
 
     # Call the solver and get an array of scores for all moves.
     # Optimal legal moves will have the highest score.
-    out = subprocess.run(["./connect4-master/call_solver.sh", moves], capture_output=True)
+    out = subprocess.run(["./connect4-master/call_solver.sh", moves],  stdout=PIPE, stderr=PIPE)
     out = out.stdout.split()
     if moves == "":
         scores = np.array(out, dtype=int)
     else:  # ignore 1st output (=moves):
         scores = np.array(out[1:], dtype=int)
-    if full_info:
+
+    if full_info:  # Return policy and value.
         mask = state.legal_actions_mask()
         p = np.extract(mask, scores)
         if (p > 0).any():  # Win
@@ -97,22 +103,36 @@ def connect_four_solver(state, full_info=False):
             v = -1
             p[p < np.amax(p)] = 0
             p[p != 0] = 1
-
         p = p / sum(p)
         return v, p
-    else:
+    elif (temperature is not None) and (temperature != 0):  # Return policy with temperature noise.
+        if temperature < 0:
+            raise ValueError('Temperature must be non-negative.')
+        # Set illegal move scores to -inf:
+        scores = np.array(scores, dtype=float)
+        scores[scores == -1000] = -np.inf
+        # Return the softmax of scores divided by temperature:
+        exponents = scores/temperature
+        if temperature == np.inf:  # Avoid inf/inf
+            exponents[exponents==None] = 0
+        return softmax(exponents)
+    else:  # Return one-hot vector of the best move (default).
         return np.argwhere(scores == np.amax(scores)).flatten()  # All optimal moves
 
 
 class SolverBot:
-    """A perfect-play bot that uses a game solver.
+    """A perfect-play bot that uses a perfect game solver.
         For pentago it uses a combination of a good agent with 10 times
         the normal MCTS steps, combined with a solver up to move 17."""
 
-    def __init__(self, game):
+    def __init__(self, game, temperature=None):
         self.use_base_bot = False
+        self.temperature = temperature
+        if temperature == 0:
+            self.temperature = None
         if str(game) == 'connect_four()':
             self.solver = connect_four_solver
+
         elif str(game) == 'pentago()':
             self.solver = pentago_solver
             self.use_base_bot = True
@@ -134,7 +154,7 @@ class SolverBot:
             of children, and the children will only contain an explore_count.
             All children except one have explore_count set to 0.
             One child, chosen randomly from all optimal moves, has explore_count=1.
-            This ensures that move will be picked by best_child(), and that the policy
+            This ensures that move will be picked by best_child(), or that the policy
             vector generated will be a one-hot encoding of the chosen child.
             """
         if self.use_base_bot:
@@ -142,28 +162,30 @@ class SolverBot:
             if state.move_number() > 17:
                 return base_root
             optimal_moves = self.solver(state)
-            # For every child of the root node, set their explore
-            # count to 0 if the move is not optimal.
-            # If it is optimal, make sure it has a least an explore
-            # count of 1 to avoid having no explored children.
             for node in base_root.children:
-                if node.action in optimal_moves:
-                    if node.explore_count == 0:
-                        node.explore_count = 1
-                else:  # The node is a suboptimal move
+                if node.action not in optimal_moves:
                     node.explore_count = 0
             return base_root
 
-        chosen_move = np.random.choice(self.solver(state))
-
+        if self.temperature is None:
+            chosen_move = np.random.choice(self.solver(state))
+        else:
+            policy = self.solver(state, temperature=self.temperature)
+            # Add a counter term to the AZ temperature applied later (T=0.25):
+            policy = policy**0.25
         num_actions = state.get_game().num_distinct_actions()
         root = mcts.SearchNode(None, None, None)
         root.explore_count = 1
 
+        num = 0
         for action in range(num_actions):
             child = mcts.SearchNode(action, None, None)
-            if action == chosen_move:
-                child.explore_count = 1
+            if self.temperature is None:
+                if action == chosen_move:
+                    child.explore_count = 1
+            else:  # Apply temperature policy
+                child.explore_count = policy[num]
+                num += 1
             root.children.append(child)
 
         return root

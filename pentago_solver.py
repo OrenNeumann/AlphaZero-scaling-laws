@@ -131,7 +131,7 @@ def state_to_array(state):
     return board
 
 
-def pentago_solver(state):
+def pentago_solver(state, temperature=None):
     """ Produces an optimal policy for the current state.
         Returns: An array of optimal moves, i.e. moves that received the
             maximal score from the solver.
@@ -153,7 +153,9 @@ def pentago_solver(state):
         - If the website fails to connect or the output was not a dict, abort.
         When aborting, the function returns a positive mask on all actions (all moves are good).
         """
-
+    if temperature is not None:
+        raise Exception('Pentago doesn\'t support a temperature solver.')
+    
     def state_to_num(s):
         return board_to_int(state_to_array(s))
 

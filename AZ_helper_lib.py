@@ -15,9 +15,7 @@
 """
 Re-implementation of OpenSpiel's alpha_zero.py code, found in:
 open_spiel/open_spiel/python/algorithms/alpha_zero/alpha_zero.py
-
 This code runs matches in parallel between two players, alternating who starts first.
-
 This version adds several functionalities, including:
 - Running many matches in parallel between two saved agents, either fully trained or from intermediate checkpoints.
 - Running matches between a saved agent and a benchmark solver player.
@@ -51,6 +49,10 @@ class Config(collections.namedtuple(
         "checkpoint_number_1",
         "checkpoint_number_2",
         "use_solver",
+        "use_two_solvers",
+        "solver_1_temp",
+        "solver_2_temp",
+
         "logfile",
         "learning_rate",
         "weight_decay",
@@ -83,7 +85,7 @@ class Config(collections.namedtuple(
 def load_config(dir_name, version='training'):
     """ Create a config object from a json file.
         'version' controls the type of Config object:
-        'training': from OpenSpiel;
+        'training': from the alpha_zero library;
         'matches': from this code.
     """
     path = dir_name + '/config.json'
@@ -110,16 +112,16 @@ def get_model_params(path):
 
 def load_model_from_checkpoint(config, checkpoint_number=None, path=None):
     """
-    - checkpoint_number: Number of checkpoint to load. If none given, will
-                load the last checkpoint saved.
-    - path: Path to the saved model. If nothing is given, will
-                load from config.path .
-    - Output: A NN model with weights loaded from the latest (or specified) checkpoint.
-    """
+     - checkpoint_number: Number of checkpoint to load. If none given, will
+                 load the last checkpoint saved.
+     - path: Path to the saved model. If nothing is given, will
+                 load from config.path .
+     - Output: A NN model with weights loaded from the latest (or specified) checkpoint.
+     """
     if path is None:
         path = config.path
 
-    # Make some changes to the config object:
+    # Make some changes to the config object
     game = pyspiel.load_game(config.game)
     params = get_model_params(path)
     config = config._replace(
@@ -128,7 +130,7 @@ def load_model_from_checkpoint(config, checkpoint_number=None, path=None):
         **params)  # Model parameters (type, width, depth)
 
     if checkpoint_number is None:
-        # Get the latest checkpoint in the log and load it to a model.
+        # Get the latest checkpoint in the log and load it to a model
         variables = {}
         with open(path + 'checkpoint') as f:
             for line in f:
@@ -136,12 +138,12 @@ def load_model_from_checkpoint(config, checkpoint_number=None, path=None):
                 variables[name] = value
         checkpoint_name = variables['model_checkpoint_path'][1:-2]
     else:
-        # Get the specified model number (on the cluster:
+        # Get the specified model number:
         checkpoint_name = path + 'checkpoint-' + str(checkpoint_number)
     """ Note: Normally, the checkpoint_path saved by OpenSpiel contains the full path.
         In some cases however, only the filename is saved, and the path should be added like this:
         checkpoint_path = path + checkpoint_name
-        
+
         Alternatively just specify: 
         checkpoint_number=-1
         To get the latest checkpoint saved.
@@ -154,7 +156,7 @@ def load_model_from_checkpoint(config, checkpoint_number=None, path=None):
 
 def my_watcher(fn):
     """A copy of alpha_zero.watcher which saves the log to the file defined in config.
-    Also passes the process number to the evaluator for random-number generation."""
+    Also passes the process number to the evaluator for rng."""
     @functools.wraps(fn)
     def _watcher(*, config, num=None, **kwargs):
         """Wrap the decorated function."""
@@ -187,7 +189,7 @@ def _my_init_bot(config, game, evaluator_, mc_matches_model=None):
     for each player.
     Also removed noise option.
     Optional params:
-    - mc_matches_model: for giving each player a different num. of MCTS simulations.
+    mc_matches_model -- for giving each player a different num. of MC simulations
     """
     if mc_matches_model is None:
         max_simulations = config.max_simulations
@@ -206,7 +208,6 @@ def _my_play_game(logger, game_num, game, bots, temperature, temperature_drop, s
     """Play one game, return the trajectory.
     Exact copy of _play_game but with a random generator seed, to avoid repetitions
     between processes when applying temperature.
-
     About the random number generator:
     Since we remove all noise other than temperature for the matches, parallel threads will
     run identical processes. This is because the unique random seed comes from non-temperature noise.
@@ -270,17 +271,22 @@ def two_player_evaluator(*, game, config, logger, queue, num):
 
     for game_num in range(config.evaluation_games):
         player_1 = game_num % 2  # Determine if model_1 is the first or second player.
-        if config.use_solver:  # Match against a perfect/almost-perfect solver.
+        if config.use_solver:  # Match against a perfect solver.
             bots = [
                 _my_init_bot(config, game, az_evaluator_1),
-                solver_bot.SolverBot(game),
+                solver_bot.SolverBot(game, config.solver_2_temp),
+            ]
+        elif config.use_two_solvers:  # Match two solvers against each other.
+            bots = [
+                solver_bot.SolverBot(game, config.solver_1_temp),
+                solver_bot.SolverBot(game, config.solver_2_temp),
             ]
         elif config.MC_matches:  # Match models with different MC steps.
             bots = [
                 _my_init_bot(config, game, az_evaluator_1, mc_matches_model=0),
                 _my_init_bot(config, game, az_evaluator_2, mc_matches_model=1),
             ]
-        else:  # Normal matches.
+        else:  # Normal match
             bots = [
                 _my_init_bot(config, game, az_evaluator_1),
                 _my_init_bot(config, game, az_evaluator_2),
@@ -326,13 +332,18 @@ def run_matches(config: Config):
         observation_shape=game.observation_tensor_shape(),
         output_size=game.num_distinct_actions())
 
+    # Print statements:
     print("Starting game", config.game)
     path = config.path
     print("Writing logs to:", path)
-    p = get_model_params(config.path_model_1)
-    print("Model_1 type: %s(%s, %s)" % (p['nn_model'], p['nn_width'], p['nn_depth']))
+    if config.use_two_solvers:
+        print("Model_1 type: Perfect solver, temperature ", config.solver_1_temp)
+        print("Model_2 type: Perfect solver, temperature ", config.solver_2_temp)
+    else:
+        p = get_model_params(config.path_model_1)
+        print("Model_1 type: %s(%s, %s)" % (p['nn_model'], p['nn_width'], p['nn_depth']))
     if config.use_solver:
-        print("Model_2 type: Perfect solver")
+        print("Model_2 type: Perfect solver, temperature ", config.solver_2_temp)
     else:
         p = get_model_params(config.path_model_2)
         print("Model_2 type: %s(%s, %s)" % (p['nn_model'], p['nn_width'], p['nn_depth']))
@@ -367,7 +378,7 @@ def run_matches(config: Config):
     for n in range(config.evaluators):
         with open(config.path + '/log-' + config.logfile + '-' + str(n) + '.txt') as f:
             lines = f.readlines()
-        score += float(lines[-2][-7:-1])  # If crashed here it means an evaluator process crashed.
+        score += float(lines[-2][-7:-1])  # If crashed here it means an evaluator crashed
     score = score / config.evaluators
 
     print('Average score for model_1: ' + str(score))

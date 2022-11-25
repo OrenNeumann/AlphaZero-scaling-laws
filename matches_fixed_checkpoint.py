@@ -48,10 +48,14 @@ def set_config(model_1, model_2):
         checkpoint_number_1=checkpoint_number,
         checkpoint_number_2=checkpoint_number,
         use_solver=False,
+        use_two_solvers=False,
+        solver_1_temp=None,
+        solver_2_temp=None,
+
         logfile='matches',
         learning_rate=0,
         weight_decay=0,
-
+        
         temperature=0.25,
         evaluators=80,
         uct_c=2,
