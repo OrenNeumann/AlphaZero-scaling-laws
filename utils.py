@@ -2,6 +2,8 @@ import time
 import matplotlib.pyplot as plt
 
 
+
+
 class Timer:
     """ A time-keeping object.
         Initialize when you want to start the timer,
