@@ -4,7 +4,10 @@ import src.match_types_library.matches_self_checkpoint
 import src.match_types_library.matches_sizes
 import src.match_types_library.matches_solver
 import src.match_types_library.matches_solver_on_solver
-{"fixed": src.match_types_library.matches_fixed_checkpoint.main, ...}
+
+
+
+matches_types_lib: dict = {"fixed": src.match_types_library.matches_fixed_checkpoint.main, ...}
 
 def print_menu():
     print("Welcome to the game!")
