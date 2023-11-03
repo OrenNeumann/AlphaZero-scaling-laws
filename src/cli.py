@@ -1,9 +1,9 @@
 from typing import Callable
-import src.match_types_library.matches_fixed_checkpoint
-import src.match_types_library.matches_self_checkpoint
-import src.match_types_library.matches_sizes
-import src.match_types_library.matches_solver
-import src.match_types_library.matches_solver_on_solver
+from src.match_types_library.matches_fixed_checkpoint import main as match_same_checkpoint
+from src.match_types_library.matches_self_checkpoint import main as match_diff_checkpoints
+from src.match_types_library.matches_sizes import main as match_final_checkpoint
+from src.match_types_library.matches_solver import main as match_solver_agent
+from src.match_types_library.matches_solver_on_solver import main as match_solver_solver
 
 
 
