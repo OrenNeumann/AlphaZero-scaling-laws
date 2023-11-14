@@ -69,7 +69,7 @@ def set_config(model, temp1=None, temp2=None):
 def main(unused_argv):
 
     # List of temperatures used, mostly exponential but with a higher density between 0.25-3
-    # because performance becomes much more sensitive to temperature change at that region.
+    # because performance becomes much more sensitive to temperature change in this region.
     temperatures = np.array([
         0,
         0.1,

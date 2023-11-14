@@ -5,27 +5,41 @@ from src.match_types_library.matches_sizes import main as match_final_checkpoint
 from src.match_types_library.matches_solver import main as match_solver_agent
 from src.match_types_library.matches_solver_on_solver import main as match_solver_solver
 
+matches_types_lib: dict = {1: match_final_checkpoint,
+                           2: match_same_checkpoint, #CP
+                           3: match_diff_checkpoints, # i, j
+                           4: match_solver_agent,
+                           5: match_solver_solver}
 
-
-matches_types_lib: dict = {"fixed": src.match_types_library.matches_fixed_checkpoint.main, ...}
 
 def print_menu():
-    print("Welcome to the game!")
-    print("Please select an option:")
-    print("1. Start a new game")
-    print("2. Load a saved game")
-    print("3. Quit")
+    print("Select a game:")
+    print("1. Connect Four")
+    print("2. Pentago")
+    print("3. Oware")
+    game_choice = get_user_choice(3)
 
-def get_user_choice() -> Callable:
-    choice = input("Enter your choice (1-3): ")
-    while choice not in ['1', '2', '3']:
-        choice = input("Invalid choice. Please enter a valid choice (1-3): ")
+    print("Select the type of matches you wish to run:")
+    print("1. Match fully-trained agents")
+    print("2. Match partially-trained agents")
+    print("3. Match different checkpoints of the same agent")
+    print("4. Match agents with a solver")
+    print("5. Match solvers with solvers")
+    match_choice = get_user_choice(5)
+
+    return game_choice, match_choice
+
+
+def get_user_choice(n) -> int:
+    choice = input("\nEnter your choice (1-{}): ".format(n))
+    while choice not in [str(i + 1) for i in range(n)]:
+        choice = input("Invalid choice. Please enter a valid choice (1-{}): ".format(n))
     return int(choice)
+
 
 def run():
     # Example usage
     print_menu()
-    user_choice = get_user_choice()
     if user_choice == 1:
         start_new_game()
     elif user_choice == 2:
