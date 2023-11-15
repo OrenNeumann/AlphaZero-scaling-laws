@@ -5,14 +5,18 @@ from src.match_types_library.matches_sizes import main as match_final_checkpoint
 from src.match_types_library.matches_solver import main as match_solver_agent
 from src.match_types_library.matches_solver_on_solver import main as match_solver_solver
 
-matches_types_lib: dict = {1: match_final_checkpoint,
-                           2: match_same_checkpoint, #CP
-                           3: match_diff_checkpoints, # i, j
-                           4: match_solver_agent,
-                           5: match_solver_solver}
+game_types: dict = {1: 'connect_four',
+                    2: 'pentago', 
+                    3: 'oware'}
+
+matches_types: dict = {1: match_final_checkpoint,
+                       2: match_same_checkpoint, #CP
+                       3: match_diff_checkpoints, # i, j
+                       4: match_solver_agent,
+                       5: match_solver_solver}
 
 
-def print_menu():
+def print_menu() -> tuple[int, int]:
     print("Select a game:")
     print("1. Connect Four")
     print("2. Pentago")
@@ -39,7 +43,7 @@ def get_user_choice(n) -> int:
 
 def run():
     # Example usage
-    print_menu()
+    game_choice, match_choice = print_menu()
     if user_choice == 1:
         start_new_game()
     elif user_choice == 2:

@@ -2,7 +2,8 @@ from absl import app
 from open_spiel.python.utils import spawn
 
 
-import src.cli as cli
+#import src.cli as cli
+import cli
 
 if __name__ == '__main__':
     user_input = cli.run()
